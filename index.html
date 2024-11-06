@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Set and Cancel Start/End Points with Cancel Symbol</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <style>
+        /* Set body and html to have no margin and fill the entire screen */
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        /* Full-screen map */
+        #map {
+            height: 100%; /* Make the map take full height */
+            width: 100%;  /* Make the map take full width */
+        }
+        .cancel-marker {
+            background-color: red;
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        // Initialize the map, centered on India
+        const map = L.map('map').setView([20.5937, 78.9629], 5); // Coordinates of India
+
+        // Load OSM tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Routing control (initially with no waypoints)
+        const routingControl = L.Routing.control({
+            waypoints: [],
+            routeWhileDragging: true,
+            showAlternatives: true,
+            createMarker: function(i, waypoint, n) {
+                // Create a custom marker with a cancel symbol
+                const markerDiv = L.DomUtil.create('div', 'cancel-marker');
+                markerDiv.innerHTML = i === 0 ? 'S' : 'E'; // 'S' for Start, 'E' for End
+                const marker = L.marker(waypoint.latLng, {
+                    icon: L.divIcon({
+                        className: 'cancel-marker',
+                        html: markerDiv.innerHTML,
+                        iconSize: [30, 30]
+                    })
+                });
+
+                marker.on('click', function() {
+                    if (i === 0) {
+                        // Cancel start point
+                        map.removeLayer(startMarker);
+                        startPoint = null;
+                        startMarker = null;
+                        routingControl.setWaypoints(endPoint ? [endPoint] : []);
+                    } else {
+                        // Cancel end point
+                        map.removeLayer(endMarker);
+                        endPoint = null;
+                        endMarker = null;
+                        routingControl.setWaypoints(startPoint ? [startPoint] : []);
+                    }
+                });
+
+                return marker;
+            }
+        }).addTo(map);
+
+        let startPoint = null;
+        let endPoint = null;
+        let startMarker = null;
+        let endMarker = null;
+
+        // Function to handle click events for setting or canceling waypoints
+        function toggleWaypoint(e) {
+            const { lat, lng } = e.latlng;
+            const clickedLatLng = L.latLng(lat, lng);
+
+            // Check if the clicked point is the start point
+            if (startPoint && startPoint.equals(clickedLatLng)) {
+                // Cancel start point
+                map.removeLayer(startMarker);
+                startPoint = null;
+                startMarker = null; // Clear reference
+                routingControl.setWaypoints(endPoint ? [endPoint] : []);
+                return;
+            }
+
+            // Check if the clicked point is the end point
+            if (endPoint && endPoint.equals(clickedLatLng)) {
+                // Cancel end point
+                map.removeLayer(endMarker);
+                endPoint = null;
+                endMarker = null; // Clear reference
+                routingControl.setWaypoints(startPoint ? [startPoint] : []);
+                return;
+            }
+
+            // Set new start or end point if both are not set
+            if (!startPoint) {
+                startPoint = clickedLatLng;
+                startMarker = L.marker(startPoint, { icon: L.divIcon({ className: 'cancel-marker', html: 'S', iconSize: [30, 30] }) }).addTo(map);
+            } else if (!endPoint) {
+                endPoint = clickedLatLng;
+                endMarker = L.marker(endPoint, { icon: L.divIcon({ className: 'cancel-marker', html: 'E', iconSize: [30, 30] }) }).addTo(map);
+            }
+
+            // Update routing control with new waypoints
+            routingControl.setWaypoints([startPoint, endPoint].filter(Boolean));
+        }
+
+        // Add a click event listener to the map
+        map.on('click', toggleWaypoint);
+    </script>
+</body>
+</html>
